@@ -1,8 +1,8 @@
-# import omni.ext
-# import omni.ui as ui
-from udp_receiver import UDPReceiver
-from skeleton_mapper import SkeletonMapper
-from vmc_parser import parse_vmc_data
+import omni.ext
+import omni.ui as ui
+from .udp_receiver import UDPReceiver
+from .skeleton_mapper import SkeletonMapper
+from .vmc_parser import parse_vmc_message
 
 
 # Functions and vars are available to other extension as usual in python: `example.python_ext.some_public_function(x)`
@@ -16,49 +16,62 @@ from vmc_parser import parse_vmc_data
 # on_shutdown() is called.
 
 class MyExtension:
-# class MyExtension(omni.ext.IExt):
-    # ext_id is current extension id. It can be used with extension manager to query additional information, like where
-    # this extension is located on filesystem.
+    def __init__(self):
+        self._window = None
 
-    # def on_startup(self, ext_id):
-    #     print("[omni.hello.world] MyExtension startup")
+    def on_startup(self):
+        self._skeleton_mapper = SkeletonMapper()
+        self._window = ui.Window("VMC Extension", width=400, height=300)
+        omni.ui.Workspace.show_window("VMC Extension", True)
+        with self._window.frame:
+            self.build_ui()
 
-    #     self._count = 0
+    def build_ui(self):
+        with ui.VStack():
+            # IP Address Input
+            ui.Label("Enter IP Address:")
+            ip_field = ui.StringField()
+            ip_field.model.add_value_changed_fn(lambda m: self.validate_ip(m.get_value_as_string()))
 
-    #     self._window = ui.Window("My Window", width=300, height=300)
-    #     with self._window.frame:
-    #         with ui.VStack():
-    #             label = ui.Label("")
-                
+            # Port Input
+            ui.Label("Enter Port:")
+            port_field = ui.StringField()
+            port_field.model.add_value_changed_fn(lambda m: self.validate_port(m.get_value_as_string()))
 
-    #             def on_click():
-    #                 self._count += 1
-    #                 label.text = f"count: {self._count}"
+            # Skeleton Selection
+            ui.Label("Select Skeleton Prim:")
+            skeleton_combo = ui.ComboBox(0, *self.get_skeleton_prims(UsdGeom.Stage.Open("path_to_stage.usda")))
+            skeleton_combo.model.add_value_changed_fn(lambda m: self.on_skeleton_selected(m.get_item_value_model().get_value_as_string()))
 
-    #             def on_reset():
-    #                 self._count = 0
-    #                 label.text = "empty"
+            self.start_button = ui.Button("Start Receiving", clicked_fn=self.start_receiving)
+            self.stop_button = ui.Button("Stop Receiving", clicked_fn=self.stop_receiving)
+            self.udp_receiver = None
 
-    #             on_reset()
+            # Debug Button
+            debug_button = ui.Button("Debug", clicked_fn=self.on_debug_clicked)
 
-    #             with ui.HStack():
-    #                 ui.Button("Add", clicked_fn=on_click)
-    #                 ui.Button("Reset", clicked_fn=on_reset)
+    # Helper functions for validation and skeleton retrieval
+    def validate_ip(ip_text):
+        pattern = r"^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$"
+        if re.match(pattern, ip_text):
+            print(f"Valid IP: {ip_text}")
+        else:
+            print("Invalid IP format")
 
-    # def on_startup(self, ext_id):
-    #     print("[my_omniverse_plugin] MyExtension startup")
+    def validate_port(port_text):
+        if port_text.isdigit() and 0 <= int(port_text) <= 65535:
+            print(f"Valid Port: {port_text}")
+        else:
+            print("Invalid Port")
 
-    #     self._count = 0
-    #     self._skeleton_mapper = SkeletonMapper()
+    def get_skeleton_prims(stage):
+        return [prim.GetPath().pathString for prim in stage.Traverse() if prim.GetTypeName() == "Skeleton"]
 
-    #     self._window = ui.Window("VMC Receiver", width=400, height=300)
-    #     with self._window.frame:
-    #         with ui.VStack():
-    #             self.label = ui.Label("Waiting for VMC data...")
-    #             self.start_button = ui.Button("Start Receiving", clicked_fn=self.start_receiving)
-    #             self.stop_button = ui.Button("Stop Receiving", clicked_fn=self.stop_receiving)
+    def on_skeleton_selected(selection):
+        print(f"Selected Skeleton: {selection}")
 
-    #             self.udp_receiver = None
+    def on_debug_clicked():
+        print("Debug Button Clicked")
 
     def on_shutdown(self):
         print("[omni.hello.world] MyExtension shutdown")
@@ -78,11 +91,11 @@ class MyExtension:
             self.label.text = "Stopped receiving."
 
     def process_vmc_data(self, data):
-        parsed_data = parse_vmc_data(data)
+        parsed_messages = parse_vmc_message(data)
         for msg in parsed_messages:
             print(msg)
         # self._skeleton_mapper.map_to_skeleton(root_position)
 
-if __name__ == "__main__":
-    plugin = MyExtension()
-    plugin.start_receiving()
+# if __name__ == "__main__":
+#     plugin = MyExtension()
+#     plugin.start_receiving()
