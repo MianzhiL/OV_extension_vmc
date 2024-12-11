@@ -81,7 +81,7 @@ def parse_single_vmc_message(data):
                 args.append(arg)
                 index = (str_end + 4) & ~0x03  # Align to 4-byte boundary
 
-        return {"address": address, "type_tags": type_tags, "args": args}
+        return {"address": address, "args": args}
 
     except Exception as e:
         print(f"Failed to parse VMC message: {e}")

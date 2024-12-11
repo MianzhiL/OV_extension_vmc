@@ -185,6 +185,8 @@ class MyExtension(omni.ext.IExt):
     def process_expression_value(data):
         expression_name = data['args'][0]
         value = data['args'][1]
+        # if value==0:
+        #     return
         print(f"Processing expression value: {expression_name}, Value: {value}")
 
     def process_expression_confirmation(data):
