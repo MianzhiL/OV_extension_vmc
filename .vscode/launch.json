@@ -6,10 +6,20 @@
     "configurations": [
         {
             "name": "Python Debugger: Current File",
-            "type": "debugpy",
+            "type": "python",
             "request": "launch",
             "program": "${file}",
-            "console": "integratedTerminal"
+            "console": "integratedTerminal",
+        },
+        {
+            "name": "Python Attach",
+            "type": "python",
+            "request": "attach",
+            "localRoot": "${workspaceFolder}",
+            "remoteRoot": "${workspaceFolder}",
+            "port": 3000,
+            "host": "localhost",
+            "subProcess": true
         }
     ]
 }
