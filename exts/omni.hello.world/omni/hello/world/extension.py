@@ -89,37 +89,6 @@ class MyExtension(omni.ext.IExt):
                 # Debug Button
                 debug_button = ui.Button("Debug", clicked_fn=self.on_debug_clicked)
 
-    # Helper functions for validation and skeleton retrieval
-    def validate_ip(self, ip_text):
-        pattern = r"^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$"
-        if re.match(pattern, ip_text):
-            print(f"Valid IP: {ip_text}")
-            self._ip=ip_text
-        else:
-            print("Invalid IP format")
-
-    def validate_port(self, port_text):
-        if port_text.isdigit() and 0 <= int(port_text) <= 65535:
-            print(f"Valid Port: {port_text}")
-            self._port=int(port_text)
-        else:
-            print("Invalid Port")
-
-    def get_skeleton_prims(stage):
-        return [prim.GetPath().pathString for prim in stage.Traverse() if prim.GetTypeName() == "Skeleton"]
-
-    def on_skeleton_selected(self, selection):
-        print(f"Selected Skeleton: {selection}")
-        self.set_skeleton(selection)
-
-    def on_debug_clicked(self):
-        print("Debug Button Clicked")
-        self._skeleton_mapper.set_skeleton(self._skeleton)
-
-    def on_shutdown(self):
-        print("[omni.hello.world] MyExtension shutdown")
-        if self.udp_receiver:
-            self.udp_receiver.stop()
 
     def start_receiving(self):
         if not self.udp_receiver:
@@ -164,6 +133,40 @@ class MyExtension(omni.ext.IExt):
 
     def submit(self):
         self._skeleton_mapper.submit_joint_transforms()
+
+
+
+    # Helper functions for validation and skeleton retrieval
+    def validate_ip(self, ip_text):
+        pattern = r"^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$"
+        if re.match(pattern, ip_text):
+            print(f"Valid IP: {ip_text}")
+            self._ip=ip_text
+        else:
+            print("Invalid IP format")
+
+    def validate_port(self, port_text):
+        if port_text.isdigit() and 0 <= int(port_text) <= 65535:
+            print(f"Valid Port: {port_text}")
+            self._port=int(port_text)
+        else:
+            print("Invalid Port")
+
+    def get_skeleton_prims(stage):
+        return [prim.GetPath().pathString for prim in stage.Traverse() if prim.GetTypeName() == "Skeleton"]
+
+    def on_skeleton_selected(self, selection):
+        print(f"Selected Skeleton: {selection}")
+        self.set_skeleton(selection)
+
+    def on_debug_clicked(self):
+        print("Debug Button Clicked")
+        self._skeleton_mapper.set_skeleton(self._skeleton)
+
+    def on_shutdown(self):
+        print("[omni.hello.world] MyExtension shutdown")
+        if self.udp_receiver:
+            self.udp_receiver.stop()
 
     def process_timestamp(data):
         timestamp = data['args'][0]
