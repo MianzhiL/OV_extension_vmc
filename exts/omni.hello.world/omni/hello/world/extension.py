@@ -16,13 +16,12 @@ from .vmc_parser import parse_vmc_message
 # on_shutdown() is called.
 
 class MyExtension:
-    def __init__(self):
-        self._window = None
+    # def __init__(self):
+    #     self._window = None
 
-    def on_startup(self):
+    def on_startup(self, ext_id):
         self._skeleton_mapper = SkeletonMapper()
         self._window = ui.Window("VMC Extension", width=400, height=300)
-        omni.ui.Workspace.show_window("VMC Extension", True)
         with self._window.frame:
             self.build_ui()
 
