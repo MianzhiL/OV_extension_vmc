@@ -117,7 +117,7 @@ class MyExtension(omni.ext.IExt):
         entry=self.frame_queue.dequeue()
         if entry:
             self._skeleton_mapper.update_skel_anim(entry["timestamp"],entry["joints"])
-        else:
+        else: 
             print("No data in frame_queue")
 
     def process_vmc_data(self, data):
