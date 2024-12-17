@@ -7,7 +7,7 @@ class CircularQueue:
 
     def enqueue(self, data):
         if (self.tail + 1) % self.max_size == self.head:
-            print("Queue is full!")
+            # print("Queue is full!")
             return False
         elif self.head == -1:  # First element
             self.head = 0

@@ -6,18 +6,22 @@ class UDPReceiver:
         self.callback = callback
         self.ip = ip
         self.port = port
-        self.running = False
+        self.stop_event = threading.Event()
         self.sock=None
 
     def start(self):
-        self.running = True
-        threading.Thread(target=self.receive_data).start()
+        self.stop_event.clear()
+        threading.Thread(target=self.receive_data, daemon=True).start()
 
     def stop(self):
-        self.running = False
+        self.stop_event.set()
         if self.sock:
-            self.sock.shutdown(socket.SHUT_RDWR)  # Shut down both read and write
-            self.sock.close()  # Close the socket
+            try:
+                self.sock.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass  # 套接字可能已经被关闭，无需处理异常
+            finally:
+                self.sock.close() # Close the socket
         print("Socket closed.")
 
     def receive_data(self):
@@ -26,7 +30,14 @@ class UDPReceiver:
 
         print(f"Listening on UDP port {self.port}...")
         
-        while self.running:
-            data, addr = self.sock.recvfrom(65535)  # 接收数据
-            if data:
-                self.callback(data)
+        while not self.stop_event.is_set():
+            try:
+                data, addr = self.sock.recvfrom(65535)  # 接收数据
+                if data:
+                    self.callback(data)
+            except OSError as e:
+                if self.stop_event.is_set():
+                    print("Socket closed, stopping receive loop.")
+                    break
+                else:
+                    raise e

@@ -150,7 +150,8 @@ class MyExtension(omni.ext.IExt):
             #     self.process_heartbeat_check(item)
         # self._skeleton_mapper.update_skel_anim(entry["timestamp"],entry["joints"])
         if not self.frame_queue.enqueue(entry):
-            print("Failed to enqueue data.")
+            # print("Failed to enqueue data.")
+            x=1
 
     def submit(self):
         self._skeleton_mapper.submit_joint_transforms()
@@ -180,7 +181,12 @@ class MyExtension(omni.ext.IExt):
 
     def on_debug_clicked(self):
         print("Debug Button Clicked")
-        self._skeleton_mapper.update_skel_anim(0, None)
+        entry=self.frame_queue.dequeue()
+        if entry:
+            self._skeleton_mapper.update_skel_anim(entry["timestamp"],entry["joints"])
+        else: 
+            print("No data in frame_queue")
+        # self._skeleton_mapper.update_skel_anim(0, None)
 
     def on_shutdown(self):
         print("[omni.hello.world] MyExtension shutdown")
@@ -189,7 +195,7 @@ class MyExtension(omni.ext.IExt):
 
     def process_timestamp(self, data):
         timestamp = data['args'][0]
-        print(f"Processing timestamp: {timestamp}")
+        # print(f"Processing timestamp: {timestamp}")
         return timestamp
 
     def process_root_pose(self, data):
