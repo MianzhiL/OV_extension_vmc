@@ -1,4 +1,5 @@
 # vmc_parser.py
+import struct
 
 def parse_vmc_message(data):
     """
@@ -15,7 +16,7 @@ def parse_vmc_message(data):
         # Extract timestamp (8 bytes)
         timestamp = struct.unpack(">q", data[index:index + 8])[0]
         index += 8
-        print(f"Bundle Timestamp: {timestamp}")
+        # print(f"Bundle Timestamp: {timestamp}")
 
         # Process each element in the bundle
         while index < len(data):

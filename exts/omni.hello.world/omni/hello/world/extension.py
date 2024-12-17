@@ -3,7 +3,9 @@ import omni.ui as ui
 from .udp_receiver import UDPReceiver
 from .skeleton_mapper import SkeletonMapper
 from .vmc_parser import parse_vmc_message
+from .CircularQueue import CircularQueue
 from pxr import Sdf, UsdSkel, Gf, UsdUtils, Usd
+import carb.events
 
 
 
@@ -53,13 +55,15 @@ class MyExtension(omni.ext.IExt):
     #     self._window = None
 
     def on_startup(self, ext_id):
+        self.frame_queue = CircularQueue(5)
         self._stage = omni.usd.get_context().get_stage()
         self._skeleton_mapper = None
         self._ip='127.0.0.1'
         self._port=39539
-        skeleton_path='/World/Character/Root'
-        self.set_skeleton(skeleton_path)
-        self._skeleton_mapper = SkeletonMapper(self._skeleton)
+        # skeleton_path='/World/Character/Root'
+        skeleton_path='/World/Armature0/Skeleton'
+        animation_path='/World/Armature0/Anim'
+        self._skeleton_mapper = SkeletonMapper(skeleton_path, animation_path)
 
         self._window = ui.Window("VMC Extension", width=400, height=300)
         with self._window.frame:
@@ -94,47 +98,62 @@ class MyExtension(omni.ext.IExt):
         if not self.udp_receiver:
             self.udp_receiver = UDPReceiver(self.process_vmc_data, self._ip, self._port)
             self.udp_receiver.start()
-            self.label.text = "Receiving VMC data..."
+            self.register_event()
+            # self.label.text = "Receiving VMC data..."
 
     def stop_receiving(self):
         if self.udp_receiver:
             self.udp_receiver.stop()
             self.udp_receiver = None
-            self.label.text = "Stopped receiving."
+            # self.label.text = "Stopped receiving."
+
+    def register_event(self):
+        app = omni.kit.app.get_app()
+        self._subscription_handle = app.get_pre_update_event_stream().create_subscription_to_pop(
+            self.on_update_anim, order=-1000000, name="anim_pre_update"
+        )
+
+    def on_update_anim(self,e):
+        entry=self.frame_queue.dequeue()
+        if entry:
+            self._skeleton_mapper.update_skel_anim(entry["timestamp"],entry["joints"])
+        else:
+            print("No data in frame_queue")
 
     def process_vmc_data(self, data):
         parsed_messages = parse_vmc_message(data)
-        for item in parsed_messages:
-            # print(msg)
-            if item['address'] == '/VMC/Ext/T':
-                self.process_timestamp(item)
-            elif item['address'] == '/VMC/Ext/Root/Pos':
-                self.process_root_pose(item)
-            elif item['address'] == '/VMC/Ext/Bone/Pos':
-                self.process_bone_pose(item, self._skeleton_mapper)
-            elif item['address'] == '/VMC/Ext/Blend/Val':
-                self.process_expression_value(item)
-            elif item['address'] == '/VMC/Ext/Blend/Apply':
-                self.process_expression_confirmation(item)
-            elif item['address'] == '/VMC/Ext/OK':
-                self.process_heartbeat_check(item)
-        submit()
 
-    def set_skeleton(self,skeleton):
-        skel_prim=self._stage.GetPrimAtPath(skeleton)
-        self._skeleton = None
-        if skel_prim:
-            self._skeleton = UsdSkel.Skeleton(skel_prim)
-            if self._skeleton_mapper:
-                self._skeleton_mapper.set_skeleton(skeleton)
-        else:
-            # failed
-            print("Bind skeleton failed: {skeleton}")
+        entry = {"timestamp": 0, 
+                 "joints": []
+                 }
+        # joint_info = {
+        #         "name": joint_name,
+        #         "position": position,
+        #         "rotation": rotation
+        #     }
+
+        for item in parsed_messages:
+            # print(item)
+            if item['address'] == '/VMC/Ext/T':
+                timestamp=self.process_timestamp(item)
+                entry["timestamp"]=timestamp
+            # elif item['address'] == '/VMC/Ext/Root/Pos':
+            #     self.process_root_pose(item)
+            elif item['address'] == '/VMC/Ext/Bone/Pos':
+                joint_info=self.process_bone_pose(item, self._skeleton_mapper)
+                entry["joints"].append(joint_info)
+            # elif item['address'] == '/VMC/Ext/Blend/Val':
+            #     self.process_expression_value(item)
+            # elif item['address'] == '/VMC/Ext/Blend/Apply':
+            #     self.process_expression_confirmation(item)
+            # elif item['address'] == '/VMC/Ext/OK':
+            #     self.process_heartbeat_check(item)
+        # self._skeleton_mapper.update_skel_anim(entry["timestamp"],entry["joints"])
+        if not self.frame_queue.enqueue(entry):
+            print("Failed to enqueue data.")
 
     def submit(self):
         self._skeleton_mapper.submit_joint_transforms()
-
-
 
     # Helper functions for validation and skeleton retrieval
     def validate_ip(self, ip_text):
@@ -161,43 +180,51 @@ class MyExtension(omni.ext.IExt):
 
     def on_debug_clicked(self):
         print("Debug Button Clicked")
-        self._skeleton_mapper.set_skeleton(self._skeleton)
+        self._skeleton_mapper.update_skel_anim(0, None)
 
     def on_shutdown(self):
         print("[omni.hello.world] MyExtension shutdown")
         if self.udp_receiver:
             self.udp_receiver.stop()
 
-    def process_timestamp(data):
+    def process_timestamp(self, data):
         timestamp = data['args'][0]
         print(f"Processing timestamp: {timestamp}")
+        return timestamp
 
-    def process_root_pose(data):
+    def process_root_pose(self, data):
         name = data['args'][0]
         translation = data['args'][1:4]
         quaternion = data['args'][4:]
         print(f"Processing root pose: {name}, Translation: {translation}, Quaternion: {quaternion}")
 
-    def process_bone_pose(data, skeleton_mapper):
+    def process_bone_pose(self, data, skeleton_mapper):
         name = data['args'][0]
         translation = data['args'][1:4]
         quaternion = data['args'][4:]
-        print(f"Processing bone pose: {name}, Translation: {translation}, Quaternion: {quaternion}")
-        skeleton_mapper.apply_bone_pose(name, translation, quaternion)
+        # print(f"Processing bone pose: {name}")
+        # print(f"Processing bone pose: {name}, Translation: {translation}, Quaternion: {quaternion}\n")
+        # skeleton_mapper.apply_bone_pose(name, translation, quaternion)
+        joint_info = {
+                "name": name,
+                "position": translation,
+                "rotation": quaternion
+            }
+        return joint_info
 
-    def process_expression_value(data):
+    def process_expression_value(self, data):
         expression_name = data['args'][0]
         value = data['args'][1]
         # if value==0:
         #     return
-        print(f"Processing expression value: {expression_name}, Value: {value}")
+        print(f"Processing expression value: {expression_name}, Value: {value}\n")
 
-    def process_expression_confirmation(data):
-        print("Processing expression confirmation.")
+    def process_expression_confirmation(self, data):
+        print("Processing expression confirmation.\n")
 
-    def process_heartbeat_check(data):
+    def process_heartbeat_check(self, data):
         args = data['args']
-        print(f"Processing heartbeat check: {args}")
+        print(f"Processing heartbeat check: {args}\n")
 
 
 # if __name__ == "__main__":
