@@ -48,6 +48,52 @@ joint_name_mapping = {
     "RightMiddleDistal": "Middle_Distal_R",
 }
 
+# joint_name_mapping = {
+#     "Hips": "Hips_Skel",
+#     'LeftUpperLeg': 'Upper_leg_L_Skel',
+#     'RightUpperLeg': 'Upper_leg_R_Skel',
+#     'LeftLowerLeg': 'Lower_leg_L_Skel',
+#     'RightLowerLeg': 'Lower_leg_R_Skel',
+#     'LeftFoot': 'Foot_L_Skel',
+#     'RightFoot': 'Foot_R_Skel',
+#     'Spine': 'Spine_Skel',
+#     'Chest': 'Chest_Skel',
+#     'Neck': 'Neck_Skel',
+#     'Head': 'Head_Skel',
+#     'LeftShoulder': 'Shoulder_L_Skel',
+#     'RightShoulder': 'Shoulder_R_Skel',
+#     'LeftUpperArm': 'Upper_arm_L_Skel',
+#     'RightUpperArm': 'Upper_arm_R_Skel',
+#     'LeftLowerArm': 'Lower_arm_L_Skel',
+#     'RightLowerArm': 'Lower_arm_R_Skel',
+#     'LeftHand': 'Hand_L_Skel',
+#     'RightHand': 'Hand_R_Skel',
+#     'LeftToes': 'Toe_L_Skel',
+#     'RightToes': 'Toe_R_Skel',
+#     'LeftEye': 'LeftEye_Skel',
+#     'RightEye': 'RightEye_Skel',
+#     'Jaw': 'Hair_Front2_Skel',
+#     # Left hand fingers
+#     'LeftThumbProximal': 'Thumb_Proximal_L_Skel',
+#     'LeftThumbIntermediate': 'Thumb_Intermediate_L_Skel',
+#     'LeftThumbDistal': 'Thumb_Distal_L_Skel',
+#     'LeftIndexProximal': 'Index_Proximal_L_Skel',
+#     'LeftIndexIntermediate': 'Index_Intermediate_L_Skel',
+#     'LeftIndexDistal': 'Index_Distal_L_Skel',
+#     'LeftMiddleProximal': 'Middle_Proximal_L_Skel',
+#     'LeftMiddleIntermediate': 'Middle_Intermediate_L_Skel',
+#     'LeftMiddleDistal': 'Middle_Distal_L_Skel',
+#     "RightThumbProximal": "Thumb_Proximal_R_Skel",
+#     "RightThumbIntermediate": "Thumb_Intermediate_R_Skel",
+#     "RightThumbDistal": "Thumb_Distal_R_Skel",
+#     "RightIndexProximal": "Index_Proximal_R_Skel",
+#     "RightIndexIntermediate": "Index_Intermediate_R_Skel",
+#     "RightIndexDistal": "Index_Distal_R_Skel",
+#     "RightMiddleProximal": "Middle_Proximal_R_Skel",
+#     "RightMiddleIntermediate": "Middle_Intermediate_R_Skel",
+#     "RightMiddleDistal": "Middle_Distal_R_Skel",
+# }
+
 def find_relative_path(joint_end_path, dict):
     matching_paths = [path for path in dict if path.endswith('/' + joint_end_path)]
     return matching_paths[0] if matching_paths else None
@@ -59,7 +105,7 @@ def convert_position_to_omniverse(position):
     :return: 转换后的 Omniverse 坐标，格式为 [x, z, y]
     """
     x, y, z = position
-    return Gf.Vec3d(x, z, y)
+    return Gf.Vec3f(x, y, z)
 
 def convert_quaternion_to_omniverse(quaternion):
     """
@@ -68,7 +114,7 @@ def convert_quaternion_to_omniverse(quaternion):
     :return: 转换后的 Omniverse 四元数，格式为 [w, x, z, y]
     """
     x, y, z, w = quaternion
-    return Gf.Quatd(w, Gf.Vec3d(x, z, y))
+    return Gf.Quatf(w, Gf.Vec3f(x, y, z))
 
 # def set_local_pose(prim, position, rotation):
     # if prim and prim.IsA(UsdGeom.Xform):
@@ -127,6 +173,10 @@ class SkeletonMapper:
         self._joint_paths=self._skeleton.GetJointsAttr().Get()
         self.joint_path_to_index = {path: i for i, path in enumerate(self._joint_paths)}
         self._default_transforms = self._skeleton.GetRestTransformsAttr().Get()
+        self._default_translations = [Gf.Vec3f(transform.ExtractTranslation()) for transform in self._default_transforms]
+        self._default_rotations = [Gf.Quatf(transform.ExtractRotationQuat()) for transform in self._default_transforms]
+        self.translations=Vt.Vec3fArray(self._default_translations)
+        self.rotations=Vt.QuatfArray(self._default_rotations)
         # a=joint_names[0]
         # b=bind_transforms[0]
         # y=1
@@ -134,12 +184,15 @@ class SkeletonMapper:
     def update_skel_anim(self, timestamp, joint_data):
         time_code = Usd.TimeCode(timestamp)
 
+        if not joint_data:
+            transform_array = Vt.Matrix4dArray(self._default_transforms)
+            self._animation.SetTransforms(transform_array, 0)
+            return
+
         # # Prepare lists for translations and rotations
-        # translations = [Gf.Vec3f(transform.ExtractTranslation()) for transform in self._default_transforms]
-        # rotations = [Gf.Quatf(transform.ExtractRotationQuat()) for transform in self._default_transforms]
         
-        default_transforms = self._default_transforms
-        transforms = list(default_transforms)
+        # default_transforms = self._default_transforms
+        # transforms = list(default_transforms)
 
         # Iterate over each joint in the entry
         for joint in joint_data:
@@ -153,21 +206,23 @@ class SkeletonMapper:
                 index = self.joint_path_to_index[joint_relative_path]
                 translation = convert_position_to_omniverse(joint["position"])
                 rotation = convert_quaternion_to_omniverse(joint["rotation"])
-                transform = Gf.Matrix4d()
-                transform.SetTranslate(translation)
-                transform.SetRotate(rotation)
-                transforms[index] = transform
+                # transform = Gf.Matrix4d()
+                # print(transform)
+                # transform.SetRotate(rotation)
+                # print(transform)
+                # transform.SetTranslate(translation)
+                # print(transform)
+                # print("\n")
+                # transforms[index] = transform
+                self.translations[index]=translation
+                self.rotations[index]=rotation
             else:
-                print(f"joint_relative_path not found: {joint_relative_path}")
+                print(f"joint_relative_path not found: {joint_end_path}")
 
-        # print(f"Bind Transforms: {self._default_transforms}")
-        # print(f"Joint Paths: {self._joint_paths}")
-        # for path in self._joint_paths:
-        #     print(f"Joint Path: {path}")
-
-        transform_array = Vt.Matrix4dArray(transforms)
-        # print(transform_array)
-        self._animation.SetTransforms(transform_array, 0)
+        # transform_array = Vt.Matrix4dArray(transforms)
+        # self._animation.SetTransforms(transform_array, 0)
+        self._animation.GetTranslationsAttr().Set(self.translations, 0)
+        self._animation.GetRotationsAttr().Set(self.rotations, 0)
         # print(f"Set transform done of timestamp: {timestamp}")
 
     

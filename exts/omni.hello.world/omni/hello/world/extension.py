@@ -61,6 +61,8 @@ class MyExtension(omni.ext.IExt):
         self._ip='127.0.0.1'
         self._port=39539
         # skeleton_path='/World/Character/Root'
+        # skeleton_path='/World/kikiyo/Armature_Skel0/Skeleton'
+        # animation_path='/World/kikiyo/Armature_Skel0/Anim'
         skeleton_path='/World/Armature0/Skeleton'
         animation_path='/World/Armature0/Anim'
         self._skeleton_mapper = SkeletonMapper(skeleton_path, animation_path)
@@ -88,6 +90,7 @@ class MyExtension(omni.ext.IExt):
             with ui.HStack():
                 self.start_button = ui.Button("Start Receiving", clicked_fn=self.start_receiving)
                 self.stop_button = ui.Button("Stop Receiving", clicked_fn=self.stop_receiving)
+                # self.stop_play_button = ui.Button("Stop Playing", clicked_fn=self.stop_playing)
                 self.udp_receiver = None
 
                 # Debug Button
@@ -181,12 +184,12 @@ class MyExtension(omni.ext.IExt):
 
     def on_debug_clicked(self):
         print("Debug Button Clicked")
-        entry=self.frame_queue.dequeue()
-        if entry:
-            self._skeleton_mapper.update_skel_anim(entry["timestamp"],entry["joints"])
-        else: 
-            print("No data in frame_queue")
-        # self._skeleton_mapper.update_skel_anim(0, None)
+        # entry=self.frame_queue.dequeue()
+        # if entry:
+        #     self._skeleton_mapper.update_skel_anim(entry["timestamp"],entry["joints"])
+        # else: 
+        #     print("No data in frame_queue")
+        self._skeleton_mapper.update_skel_anim(0, None)
 
     def on_shutdown(self):
         print("[omni.hello.world] MyExtension shutdown")
