@@ -117,7 +117,7 @@ def convert_position_to_omniverse(position):
         Gf.Vec3f: Converted Omniverse coordinates in the format [x, z, y].
     """
     x, y, z = position
-    return Gf.Vec3f(x, z, y)
+    return Gf.Vec3f(x, y, z)
 
 def convert_quaternion_to_omniverse(quaternion):
     """Convert left-handed (Y-up) quaternion to Omniverse (Z-up, Right-handed) quaternion.
@@ -129,7 +129,7 @@ def convert_quaternion_to_omniverse(quaternion):
         Gf.Quatf: Converted Omniverse quaternion in the format [w, x, z, y].
     """
     x, y, z, w = quaternion
-    return Gf.Quatf(w, Gf.Vec3f(x, z, y))
+    return Gf.Quatf(w, Gf.Vec3f(x, y, z))
 
 class SkeletonMapper:
     def __init__(self, skeleton_path, animation_path):

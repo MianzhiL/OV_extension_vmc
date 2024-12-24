@@ -4,10 +4,10 @@ from .udp_receiver import UDPReceiver
 from .skeleton_mapper import SkeletonMapper
 from .vmc_parser import parse_vmc_message
 from .CircularQueue import CircularQueue
+from .TimeAligner import TimeAligner
 from pxr import Sdf, UsdSkel, Gf, UsdUtils, Usd
 import carb.events
 import re
-
 
 class Extension(omni.ext.IExt):
     """Omniverse Extension for receiving and processing VMC data for skeleton animation."""
@@ -16,10 +16,11 @@ class Extension(omni.ext.IExt):
 
     def on_startup(self, ext_id):
         """Initialize the extension and set up the UI and UDP receiver."""
-        self.frame_queue = CircularQueue(5)
+        self.frame_queue = CircularQueue(self.MAX_QUEUE_SIZE)
         self._stage = omni.usd.get_context().get_stage()
         self._ip='127.0.0.1'
         self._port=39539
+        self.time_aligner=TimeAligner()
         
         skeleton_path='/World/kikiyo/Armature_Skel/Skeleton'
         animation_path='/World/kikiyo/Armature_Skel/Anim'
@@ -34,12 +35,14 @@ class Extension(omni.ext.IExt):
         with ui.VStack():
             # IP Address Input
             ui.Label("Enter IP Address:")
-            ip_field = ui.StringField()
+            ip_model = ui.SimpleStringModel("127.0.0.1")  # Set default value here
+            ip_field = ui.StringField(model=ip_model)
             ip_field.model.add_value_changed_fn(lambda m: self.validate_ip(m.get_value_as_string()))
 
             # Port Input
             ui.Label("Enter Port:")
-            port_field = ui.StringField()
+            port_model = ui.SimpleStringModel("39539")
+            port_field = ui.StringField(model=port_model)
             port_field.model.add_value_changed_fn(lambda m: self.validate_port(m.get_value_as_string()))
             
             with ui.HStack():
@@ -63,16 +66,44 @@ class Extension(omni.ext.IExt):
         if self.udp_receiver:
             self.udp_receiver.stop()
             self.udp_receiver = None
+        
+        # Unregister the event subscription if it exists
+        if hasattr(self, '_subscription_handle') and self._subscription_handle:
+            app = omni.kit.app.get_app()
+            event_stream = app.get_pre_update_event_stream()
+            try:
+                self._subscription_handle = None  # Clear the subscription handle
+                print("Successfully unregistered event subscription.")
+            except Exception as e:
+                print(f"Failed to unregister event subscription: {e}")
+        print("Stopped receiving and unregistered event.")
 
     def register_event(self):
         """Register the update event for animating the skeleton."""
         app = omni.kit.app.get_app()
+
+        # Reset TimeAligner when registering
+        self.time_aligner.reset()  # Reset TimeAligner
+
         self._subscription_handle = app.get_pre_update_event_stream().create_subscription_to_pop(
             self.on_update_anim, order=-1000000, name="anim_pre_update"
         )
 
     def on_update_anim(self,e):
         """Update skeleton animation based on received data."""
+        # Get closest valid frame based on aligned timestamps
+        if self.frame_queue.is_empty():
+            print("No data in frame_queue")
+            return
+        
+        closest_frame = self.time_aligner.get_valid_frame(self.frame_queue)
+        if closest_frame:
+            # Process the closest valid frame without dequeuing it immediately
+            self._skeleton_mapper.update_skel_anim(closest_frame["timestamp"], closest_frame["root"], closest_frame["joints"])
+            print(f"Processed frame: {closest_frame}")
+        else:
+            print("No valid future data in frame_queue")
+            
         entry=self.frame_queue.dequeue()
         if entry:
             self._skeleton_mapper.update_skel_anim(entry["timestamp"],entry["root"],entry["joints"])
@@ -104,12 +135,12 @@ class Extension(omni.ext.IExt):
             elif item['address'] == '/VMC/Ext/Bone/Pos':
                 joint_info=self.process_bone_pose(item)
                 entry["joints"].append(joint_info)
-            elif item['address'] == '/VMC/Ext/Blend/Val':
-                self.process_expression_value(item)
-            elif item['address'] == '/VMC/Ext/Blend/Apply':
-                self.process_expression_confirmation(item)
-            elif item['address'] == '/VMC/Ext/OK':
-                self.process_heartbeat_check(item)
+            # elif item['address'] == '/VMC/Ext/Blend/Val':
+            #     self.process_expression_value(item)
+            # elif item['address'] == '/VMC/Ext/Blend/Apply':
+            #     self.process_expression_confirmation(item)
+            # elif item['address'] == '/VMC/Ext/OK':
+            #     self.process_heartbeat_check(item)
         if not self.frame_queue.enqueue(entry):
             print("Failed to enqueue data.")
 
@@ -146,7 +177,7 @@ class Extension(omni.ext.IExt):
 
     def process_timestamp(self, data):
         timestamp = data['args'][0]
-        # print(f"Processing timestamp: {timestamp}")
+        print(f"Processing timestamp: {timestamp}")
         return timestamp
 
     def process_root_pose(self, data):
