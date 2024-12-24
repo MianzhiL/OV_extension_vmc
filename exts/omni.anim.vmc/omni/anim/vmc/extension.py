@@ -21,8 +21,8 @@ class Extension(omni.ext.IExt):
         self._ip='127.0.0.1'
         self._port=39539
         
-        skeleton_path='/World/kikiyo_01/kikiyo/Armature_Skel/Skeleton'
-        animation_path='/World/kikiyo_01/kikiyo/Armature_Skel/Anim'
+        skeleton_path='/World/kikiyo/Armature_Skel/Skeleton'
+        animation_path='/World/kikiyo/Armature_Skel/Anim'
         self._skeleton_mapper = SkeletonMapper(skeleton_path, animation_path)
 
         self._window = ui.Window("VMC Extension", width=400, height=300)
@@ -137,7 +137,7 @@ class Extension(omni.ext.IExt):
         #     self._skeleton_mapper.update_skel_anim(entry["timestamp"],entry["joints"])
         # else: 
         #     print("No data in frame_queue")
-        self._skeleton_mapper.update_skel_anim(0, None)
+        self._skeleton_mapper.update_skel_anim(0, None, None)
 
     def on_shutdown(self):
         print("[omni.anim.vmc] VMC extension shutdown")
