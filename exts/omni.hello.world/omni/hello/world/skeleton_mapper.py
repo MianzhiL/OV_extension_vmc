@@ -95,60 +95,60 @@ joint_name_mapping = {
 # }
 
 def find_relative_path(joint_end_path, dict):
+    """Find the relative path of a joint in the provided paths.
+
+    Args:
+        joint_end_path (str): The end path of the joint.
+        paths (list): A list of paths to search.
+
+    Returns:
+        str or None: The matching path if found, otherwise None.
+    """
     matching_paths = [path for path in dict if path.endswith('/' + joint_end_path)]
     return matching_paths[0] if matching_paths else None
 
 def convert_position_to_omniverse(position):
-    """
-    将左手 (Y-up) 坐标转换为 Omniverse (Z-up, Right-handed) 坐标。
-    :param position: 左手坐标，格式为 [x, y, z]
-    :return: 转换后的 Omniverse 坐标，格式为 [x, z, y]
+    """Convert left-handed (Y-up) coordinates to Omniverse (Z-up, Right-handed) coordinates.
+
+    Args:
+        position (list): Left-handed coordinates in the format [x, y, z].
+
+    Returns:
+        Gf.Vec3f: Converted Omniverse coordinates in the format [x, z, y].
     """
     x, y, z = position
-    return Gf.Vec3f(x, y, z)
+    return Gf.Vec3f(x, z, y)
 
 def convert_quaternion_to_omniverse(quaternion):
-    """
-    将左手 (Y-up) 四元数转换为 Omniverse (Z-up, Right-handed) 四元数。
-    :param quaternion: 左手四元数，格式为 [w, x, y, z]
-    :return: 转换后的 Omniverse 四元数，格式为 [w, x, z, y]
+    """Convert left-handed (Y-up) quaternion to Omniverse (Z-up, Right-handed) quaternion.
+
+    Args:
+        quaternion (list): Left-handed quaternion in the format [w, x, y, z].
+
+    Returns:
+        Gf.Quatf: Converted Omniverse quaternion in the format [w, x, z, y].
     """
     x, y, z, w = quaternion
-    return Gf.Quatf(w, Gf.Vec3f(x, y, z))
+    return Gf.Quatf(w, Gf.Vec3f(x, z, y))
 
-# def set_local_pose(prim, position, rotation):
-    # if prim and prim.IsA(UsdGeom.Xform):
-    #     xformable = UsdGeom.Xform(prim)
-    #     # Retrieve existing transform operations
-    #     xform_ops = xformable.GetOrderedXformOps()
-        
-    #     # Find existing translate and orient operations
-    #     translate_op = next((op for op in xform_ops if op.GetOpType() == UsdGeom.XformOp.TypeTranslate), None)
-    #     orient_op = next((op for op in xform_ops if op.GetOpType() == UsdGeom.XformOp.TypeOrient), None)
-        
-    #     # Update or create translate operation
-    #     if translate_op:
-    #         translate_op.Set(Gf.Vec3d(position))
-    #     else:
-    #         translate_op = xformable.AddTranslateOp()
-    #         translate_op.Set(Gf.Vec3d(position))
-        
-    #     # Update or create orient operation
-    #     if orient_op:
-    #         quaternion = Gf.Quatf(rotation[3], rotation[0], rotation[1], rotation[2])  # Quaternion format (w, x, y, z)
-    #         orient_op.Set(quaternion)
-    #     else:
-    #         orient_op = xformable.AddOrientOp()
-    #         quaternion = Gf.Quatf(rotation[3], rotation[0], rotation[1], rotation[2])
-    #         orient_op.Set(quaternion)
-        
 class SkeletonMapper:
     def __init__(self, skeleton_path, animation_path):
+        """Initialize the SkeletonMapper with given skeleton and animation paths.
+
+        Args:
+            skeleton_path (str): The USD path to the skeleton.
+            animation_path (str): The USD path for the animation.
+        """
         self._stage = omni.usd.get_context().get_stage()
         self.set_skeleton(skeleton_path)
         self.define_animation(animation_path)
 
     def define_animation(self, animation_path):
+        """Define the animation for the skeleton.
+
+        Args:
+            animation_path (str): The USD path for the animation.
+        """
         self._animation = UsdSkel.Animation.Define(self._stage, animation_path)
         self._animation.GetJointsAttr().Set(self._joint_paths)
         constant_scales = [Gf.Vec3h(1.0, 1.0, 1.0) for _ in self._joint_paths]
@@ -161,106 +161,76 @@ class SkeletonMapper:
             raise ValueError("Invalid prim: self._skel_prim is not a valid UsdPrim.")
 
     def set_skeleton(self, skeleton_path):
+        """Set the skeleton based on the provided path.
+
+        Args:
+            skeleton_path (str): The USD path to the skeleton.
+        """
         self._skel_prim=self._stage.GetPrimAtPath(skeleton_path)
         self._skeleton = None
-        if self._skel_prim:
-            self._skeleton = UsdSkel.Skeleton(self._skel_prim)
-        else:
-            # failed
-            print("Bind skeleton failed: {skeleton_path}")
+        if not self._skel_prim:
+            print(f"Bind skeleton failed: {skeleton_path}")
             return
-
+        self._skeleton = UsdSkel.Skeleton(self._skel_prim)
+        if not self._skeleton:
+            print(f"Bind skeleton failed: {skeleton_path}")
+            return
+        
         self._joint_paths=self._skeleton.GetJointsAttr().Get()
         self.joint_path_to_index = {path: i for i, path in enumerate(self._joint_paths)}
         self._default_transforms = self._skeleton.GetRestTransformsAttr().Get()
+        # Extract default translations and rotations
         self._default_translations = [Gf.Vec3f(transform.ExtractTranslation()) for transform in self._default_transforms]
         self._default_rotations = [Gf.Quatf(transform.ExtractRotationQuat()) for transform in self._default_transforms]
+        
+        # Initialize translation and rotation arrays
         self.translations=Vt.Vec3fArray(self._default_translations)
         self.rotations=Vt.QuatfArray(self._default_rotations)
-        # a=joint_names[0]
-        # b=bind_transforms[0]
-        # y=1
-    
-    def update_skel_anim(self, timestamp, joint_data):
+
+    def update_skel_anim(self, timestamp, root_data, joint_data):
+        """Update skeleton animation based on received data.
+
+        Args:
+            timestamp (float): The timestamp of the animation update.
+            root_data (dict): Data for the root joint.
+            joint_data (list): List of joint data dictionaries.
+        """
         time_code = Usd.TimeCode(timestamp)
 
         if not joint_data:
             transform_array = Vt.Matrix4dArray(self._default_transforms)
             self._animation.SetTransforms(transform_array, 0)
             return
-
-        # # Prepare lists for translations and rotations
         
-        # default_transforms = self._default_transforms
-        # transforms = list(default_transforms)
+        if root_data:
+            root_translation = convert_position_to_omniverse(root_data["position"])
+            root_rotation = convert_quaternion_to_omniverse(root_data["rotation"])
+            self.translations[0]=root_translation
+            self.rotations[0]=root_rotation
 
         # Iterate over each joint in the entry
         for joint in joint_data:
             joint_name = joint["name"]
+
             if joint_name not in joint_name_mapping:
                 print(f"joint not found in dict: {joint_name}\n")
                 continue
+
             joint_end_path=joint_name_mapping[joint_name]
             joint_relative_path=find_relative_path(joint_end_path,self._joint_paths)
+
             if joint_relative_path in self.joint_path_to_index:
                 index = self.joint_path_to_index[joint_relative_path]
                 translation = convert_position_to_omniverse(joint["position"])
                 rotation = convert_quaternion_to_omniverse(joint["rotation"])
-                # transform = Gf.Matrix4d()
-                # print(transform)
-                # transform.SetRotate(rotation)
-                # print(transform)
-                # transform.SetTranslate(translation)
-                # print(transform)
-                # print("\n")
-                # transforms[index] = transform
+
+                # Update translations and rotations
                 self.translations[index]=translation
                 self.rotations[index]=rotation
             else:
                 print(f"joint_relative_path not found: {joint_end_path}")
 
-        # transform_array = Vt.Matrix4dArray(transforms)
-        # self._animation.SetTransforms(transform_array, 0)
+        # Set updated translations and rotations to animation attributes
         self._animation.GetTranslationsAttr().Set(self.translations, 0)
         self._animation.GetRotationsAttr().Set(self.rotations, 0)
         # print(f"Set transform done of timestamp: {timestamp}")
-
-    
-    def apply_bone_pose(self, joint_name, translation, quaternion):
-        if joint_name not in joint_name_mapping:
-            print("joint not found in dict: {joint_name}\n")
-            return
-        joint_end_path=joint_name_mapping[joint_name]
-        joint_relative_path=find_relative_path(joint_end_path,self._joint_paths)
-        if not joint_relative_path:
-            print("joint not found in model: {joint_end_path}\n")
-            return
-        joint_path=f"/World/Armature0/Skeleton/{joint_relative_path}"
-        joint_prim = self._stage.GetPrimAtPath(joint_path)
-        if not joint_prim.IsValid():
-            print("joint path wrong: {joint_path}")
-        set_local_pose(joint_prim,translation,quaternion)
-
-        # joint_index = self._joint_names.index(joint_name)
-
-        # target_matrix = self._joint_transforms[joint_index]
-        # target_matrix.SetTranslateOnly(Gf.Vec3d(translation))
-        # rotation_matrix = Gf.Quatf(*quaternion).GetMatrix()
-        # target_matrix.SetRotateOnly(Gf.Rotation(Gf.Matrix3d(rotation_matrix)))
-        
-    # def map_to_skeleton(self, parsed_messages):
-    #     for joint_name, translation, quaternion in parsed_messages:
-    #         if joint_name not in self._joint_names:
-    #             print("joint not found: {joint_name}\n")
-    #             continue
-    #         joint_index = self._joint_names.index(joint_name)
-
-    #         target_matrix = self._joint_transforms[joint_index]
-    #         target_matrix.SetTranslateOnly(Gf.Vec3d(translation))
-    #         rotation_matrix = Gf.Quatf(*quaternion).GetMatrix()
-    #         target_matrix.SetRotateOnly(Gf.Rotation(Gf.Matrix3d(rotation_matrix)))
-
-    # def submit_joint_transforms(self):
-    #     self._skeleton.GetJointLocalTransformsAttr().Set(self._joint_transforms)
-
-    

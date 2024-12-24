@@ -3,7 +3,7 @@
 version = "1.0.0"
 
 # The title and description fields are primarily for displaying extension info in UI
-title = "Simple UI Extension Template"
+title = "VMC Skelanimation Extension"
 description = "The simplest python extension example. Use it as a starting point for your extensions."
 
 # Path (relative to the root) or content of readme markdown file for UI.
@@ -19,7 +19,7 @@ repository = "https://github.com/NVIDIA-Omniverse/kit-extension-template"
 category = "Example"
 
 # Keywords for the extension
-keywords = ["kit", "example"]
+keywords = ["kit", "animation", "vmc"]
 
 # Icon to show in the extension manager
 icon = "data/icon.png"
@@ -35,7 +35,7 @@ preview_image = "data/preview.png"
 
 # Main python module this extension provides, it will be publicly available as "import omni.hello.world".
 [[python.module]]
-name = "omni.hello.world"
+name = "omni.anim.vmc"
 
 [[test]]
 # Extra dependencies only to be used during test run
