@@ -92,6 +92,19 @@ joint_name_mapping = {
     "RightMiddleProximal": "Middle_Proximal_R_Skel",
     "RightMiddleIntermediate": "Middle_Intermediate_R_Skel",
     "RightMiddleDistal": "Middle_Distal_R_Skel",
+
+    "LeftRingProximal":"Ring_Proximal_L_Skel",
+    "LeftRingIntermediate":"Ring_Intermediate_L_Skel",
+    "LeftRingDistal":"Ring_Distal_L_Skel",
+    "LeftLittleProximal":"Little_Proximal_L_Skel",
+    "LeftLittleIntermediate":"Little_Intermediate_L_Skel",
+    "LeftLittleDistal":"Little_Distal_L_Skel",
+    "RightRingProximal":"Ring_Proximal_R_Skel",
+    "RightRingIntermediate":"Ring_Intermediate_R_Skel",
+    "RightRingDistal":"Ring_Distal_R_Skel",
+    "RightLittleProximal":"Little_Proximal_R_Skel",
+    "RightLittleIntermediate":"Little_Intermediate_R_Skel",
+    "RightLittleDistal":"Little_Distal_R_Skel"
 }
 
 def find_relative_path(joint_end_path, dict):

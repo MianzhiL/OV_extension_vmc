@@ -45,6 +45,7 @@ class TimeAligner:
         while frame_queue and not frame_queue.is_empty():
             front_frame = frame_queue.front()  # Peek at the front frame without removing it
             if front_frame['timestamp'] >= current_aligned_time:
+                print(f"Dequeue timestamp: {front_frame['timestamp']}")
                 return front_frame  # Return the first valid future frame
             
             frame_queue.dequeue()  # Remove outdated frames

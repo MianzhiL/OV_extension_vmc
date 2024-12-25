@@ -12,7 +12,7 @@ import re
 class Extension(omni.ext.IExt):
     """Omniverse Extension for receiving and processing VMC data for skeleton animation."""
 
-    MAX_QUEUE_SIZE = 5  # Maximum size of the frame queue
+    MAX_QUEUE_SIZE = 10  # Maximum size of the frame queue
 
     def on_startup(self, ext_id):
         """Initialize the extension and set up the UI and UDP receiver."""
@@ -100,15 +100,15 @@ class Extension(omni.ext.IExt):
         if closest_frame:
             # Process the closest valid frame without dequeuing it immediately
             self._skeleton_mapper.update_skel_anim(closest_frame["timestamp"], closest_frame["root"], closest_frame["joints"])
-            print(f"Processed frame: {closest_frame}")
+            # print(f"Processed frame: {closest_frame}")
         else:
             print("No valid future data in frame_queue")
             
-        entry=self.frame_queue.dequeue()
-        if entry:
-            self._skeleton_mapper.update_skel_anim(entry["timestamp"],entry["root"],entry["joints"])
-        else: 
-            print("No data in frame_queue")
+        # entry=self.frame_queue.dequeue()
+        # if entry:
+        #     self._skeleton_mapper.update_skel_anim(entry["timestamp"],entry["root"],entry["joints"])
+        # else: 
+        #     print("No data in frame_queue")
 
     def process_vmc_data(self, data):
         """Process incoming VMC data and enqueue it for animation updates."""
@@ -177,7 +177,7 @@ class Extension(omni.ext.IExt):
 
     def process_timestamp(self, data):
         timestamp = data['args'][0]
-        print(f"Processing timestamp: {timestamp}")
+        print(f"Enqueue processing timestamp: {timestamp}")
         return timestamp
 
     def process_root_pose(self, data):
